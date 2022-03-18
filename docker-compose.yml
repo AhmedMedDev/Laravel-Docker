@@ -1,121 +1,53 @@
-version: '3'
-
-networks:
-  laravel:
-
+version: "3.7"
 services:
-  site:
+  app:
     build:
-      context: ./dockerfiles
-      dockerfile: nginx.dockerfile
       args:
-        - UID=${UID:-1000}
-        - GID=${GID:-1000}
-    container_name: nginx
-    ports:
-      - 80:80
-    volumes:
-      - ./src:/var/www/html:delegated
-    depends_on:
-      - php
-      - redis
-      - mysql
-      - mailhog
-    networks:
-      - laravel
-
-  mysql:
-    image: mariadb:10.6
-    container_name: mysql
+        user: www
+        uid: 1000
+      context: ./
+      dockerfile: Dockerfile
+    image: laravel-image
+    container_name: laravel-app
     restart: unless-stopped
-    tty: true
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+      - ./php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - app-network
+
+  db:
+    image: mysql:5.7
+    container_name: laravel-db
+    restart: unless-stopped
     ports:
-      - 3306:3306
+      - "3306:3306"
     environment:
-      MYSQL_DATABASE: homestead
-      MYSQL_USER: homestead
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
       SERVICE_TAGS: dev
       SERVICE_NAME: mysql
-    networks:
-      - laravel
-
-  php:
-    build:
-      context: ./dockerfiles
-      dockerfile: php.dockerfile
-      args:
-        - UID=${UID:-1000}
-        - GID=${GID:-1000}
-    container_name: php
     volumes:
-      - ./src:/var/www/html:delegated
+      - ./mysql/my.cnf:/etc/mysql/my.cnf
+      - ./mysql/docker-entrypoint-initdb.d/:/docker-entrypoint-initdb.d/
     networks:
-      - laravel
+      - app-network
 
-  redis:
-    image: redis:alpine
-    container_name: redis
+  nginx:
+    image: nginx:alpine
+    container_name: laravel-nginx
     restart: unless-stopped
     ports:
-      - 6379:6379
-    networks:
-      - laravel
-
-  composer:
-    build:
-      context: ./dockerfiles
-      dockerfile: composer.dockerfile
-      args:
-        - UID=${UID:-1000}
-        - GID=${GID:-1000}
-    container_name: composer
+      - 8000:80
     volumes:
-      - ./src:/var/www/html
-    working_dir: /var/www/html
-    depends_on:
-      - php
-    user: laravel
-    entrypoint: ['composer', '--ignore-platform-reqs']
+      - ./:/var/www
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
     networks:
-      - laravel
+      - app-network
 
-  npm:
-    image: node:13.7
-    container_name: npm
-    volumes:
-      - ./src:/var/www/html
-    ports:
-      - 3000:3000
-      - 3001:3001
-    working_dir: /var/www/html
-    entrypoint: ['npm']
-    networks:
-      - laravel
-
-  artisan:
-    build:
-      context: ./dockerfiles
-      dockerfile: php.dockerfile
-      args:
-        - UID=${UID:-1000}
-        - GID=${GID:-1000}
-    container_name: artisan
-    volumes:
-      - ./src:/var/www/html:delegated
-    depends_on:
-      - mysql
-    working_dir: /var/www/html
-    entrypoint: ['php', '/var/www/html/artisan']
-    networks:
-      - laravel
-
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: mailhog
-    ports:
-      - 1025:1025
-      - 8025:8025
-    networks:
-      - laravel
+networks:
+  app-network:
+    driver: bridge
