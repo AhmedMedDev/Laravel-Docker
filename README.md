@@ -6,3 +6,4 @@
 - MySQL
 - PHP
 - Phpmyadmin
+- Composer
